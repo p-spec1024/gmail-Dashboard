@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getUnreadEmails } from '@/lib/gmail';
 import { categorizeEmail } from '@/lib/gemini';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]/route';
 
 export async function GET() {
   try {
-    // 1. Fetch unread emails from Gmail
-    const emails = await getUnreadEmails();
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.accessToken) {
+      return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
+    }
+
+    // 1. Fetch unread emails from Gmail using OAuth access token
+    const emails = await getUnreadEmails(session.accessToken);
 
     // 2. Process each email with Gemini sequentially to avoid rate limits
     // Note: To avoid 15 RPM free tier limits entirely for 50 emails, we'd need

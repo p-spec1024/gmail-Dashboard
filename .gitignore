@@ -44,3 +44,5 @@ next-env.d.ts
 credentials.json
 token.json
 .env.local
+dev.log
+dev2.log

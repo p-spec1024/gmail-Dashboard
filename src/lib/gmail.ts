@@ -1,68 +1,14 @@
 import { google } from 'googleapis';
-import { authenticate } from '@google-cloud/local-auth';
-import path from 'path';
-import fs from 'fs/promises';
 
-// If modifying these scopes, delete token.json.
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const TOKEN_PATH = path.join(process.cwd(), 'token.json');
-const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+export async function getUnreadEmails(accessToken: string) {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
 
-/**
- * Reads previously authorized credentials from the save file.
- *
- * @return {Promise<OAuth2Client|null>}
- */
-async function loadSavedCredentialsIfExist() {
-  try {
-    const content = await fs.readFile(TOKEN_PATH, 'utf-8');
-    const credentials = JSON.parse(content);
-    return google.auth.fromJSON(credentials);
-  } catch {
-    return null;
-  }
-}
+  oauth2Client.setCredentials({ access_token: accessToken });
 
-/**
- * Serializes credentials to a file compatible with GoogleAuth.fromJSON.
- *
- * @param {import('googleapis').Auth.OAuth2Client} client
- * @return {Promise<void>}
- */
-async function saveCredentials(client: any) {
-  const content = await fs.readFile(CREDENTIALS_PATH, 'utf-8');
-  const keys = JSON.parse(content);
-  const key = keys.installed || keys.web;
-  const payload = JSON.stringify({
-    type: 'authorized_user',
-    client_id: key.client_id,
-    client_secret: key.client_secret,
-    refresh_token: client.credentials?.refresh_token,
-  });
-  await fs.writeFile(TOKEN_PATH, payload);
-}
-
-/**
- * Load or request or authorization to call APIs.
- */
-export async function authorize() {
-  const existingClient = await loadSavedCredentialsIfExist();
-  if (existingClient) {
-    return existingClient;
-  }
-  const client = await authenticate({
-    scopes: SCOPES,
-    keyfilePath: CREDENTIALS_PATH,
-  });
-  if (client.credentials) {
-    await saveCredentials(client);
-  }
-  return client;
-}
-
-export async function getUnreadEmails() {
-  const auth = await authorize();
-  const gmail = google.gmail({ version: 'v1', auth: auth as any });
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
   const res = await gmail.users.messages.list({
     userId: 'me',

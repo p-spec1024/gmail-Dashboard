@@ -1,19 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { Sidebar } from '@/components/Sidebar';
 import { EmailFeed } from '@/components/EmailFeed';
 import { EmailData } from '@/components/EmailCard';
-import { RefreshCw, Search, ShieldAlert } from 'lucide-react';
+import { RefreshCw, Search, ShieldAlert, LogIn, LogOut } from 'lucide-react';
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [emails, setEmails] = useState<EmailData[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEmails = async () => {
+  const fetchEmails = useCallback(async () => {
+    if (status !== 'authenticated') return;
+
     setIsLoading(true);
     setError(null);
     try {
@@ -48,11 +52,44 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [status]);
 
   useEffect(() => {
-    fetchEmails();
-  }, []);
+    if (status === 'authenticated') {
+      fetchEmails();
+    }
+  }, [status, fetchEmails]);
+
+  if (status === 'loading') {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="flex flex-col h-screen w-full items-center justify-center bg-slate-900 text-slate-200">
+        <div className="max-w-md w-full p-8 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-center space-y-6 shadow-2xl">
+          <div className="mx-auto w-16 h-16 bg-indigo-500/20 rounded-full flex items-center justify-center mb-4">
+             <ShieldAlert className="w-8 h-8 text-indigo-400" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Smart Inbox</h1>
+          <p className="text-gray-400 pb-4">
+             Sign in with your Google account to let AI categorize and summarize your unread emails securely.
+          </p>
+          <button
+            onClick={() => signIn('google')}
+            className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-indigo-500/30"
+          >
+             <LogIn size={20} />
+             <span>Sign In with Google</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const filteredEmails = selectedCategory
     ? emails.filter((email) => email.parentCategory === selectedCategory)
@@ -89,22 +126,30 @@ export default function Home() {
                <span>Sync</span>
              </button>
 
-             <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 border-2 border-slate-800 shadow-lg cursor-pointer" title="Profile" />
+             <div className="flex items-center gap-3 border-l border-white/10 pl-4 ml-2">
+               {session?.user?.image ? (
+                 <img src={session.user.image} alt="Profile" className="h-8 w-8 rounded-full border border-white/20" />
+               ) : (
+                 <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 border border-white/20 shadow-lg" />
+               )}
+               <button
+                 onClick={() => signOut()}
+                 className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                 title="Sign Out"
+               >
+                 <LogOut size={18} />
+               </button>
+             </div>
            </div>
         </header>
 
         {error ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center h-full">
             <ShieldAlert size={48} className="text-rose-400 mb-4" />
-            <h2 className="text-2xl font-semibold text-rose-300 mb-2">Authentication Needed</h2>
+            <h2 className="text-2xl font-semibold text-rose-300 mb-2">Error Fetching Inbox</h2>
             <p className="text-gray-400 max-w-md mb-6">
                {error}
             </p>
-            <div className="bg-slate-900/50 border border-white/10 p-6 rounded-xl text-left font-mono text-sm text-gray-300 space-y-2">
-               <p>1. Ensure <span className="text-yellow-400">credentials.json</span> is in the project root.</p>
-               <p>2. Ensure <span className="text-yellow-400">token.json</span> is generated/present.</p>
-               <p>3. Ensure <span className="text-yellow-400">GEMINI_API_KEY</span> is in <span className="text-yellow-400">.env.local</span>.</p>
-            </div>
           </div>
         ) : (
           <EmailFeed
