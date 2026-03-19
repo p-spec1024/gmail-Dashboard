@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 
-export async function getUnreadEmails(accessToken: string) {
+export async function getUnreadEmails(accessToken: string, limit: number = 50) {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET
@@ -13,7 +13,7 @@ export async function getUnreadEmails(accessToken: string) {
   const res = await gmail.users.messages.list({
     userId: 'me',
     q: 'is:unread',
-    maxResults: 50,
+    maxResults: limit,
   });
 
   const messages = res.data.messages || [];
